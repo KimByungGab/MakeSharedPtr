@@ -1,54 +1,70 @@
-﻿#pragma once
+﻿#include <iostream>
+#include <Windows.h> // Sleep()
+#include "SmartPtr.h"
 
-#include <thread>
+//using namespace std;
 
-#include "SharedPtr.h"
 
-using namespace std;
 
-class Knight
+// 테스트용 클래스
+class Test
 {
 public:
-	Knight()
-	{
-		hp = 50;
-		damage = 10;
+	Test(int v) : value(v) {
+		std::cout << "Test(" << value << ") 생성\n";
 	}
-
-	int hp;
-	int damage;
+	~Test() {
+		std::cout << "Test(" << value << ") 소멸\n";
+	}
+	void Print() { std::cout << "Value: " << value << std::endl; }
+private:
+	int value;
 };
+
+// 멀티스레드 테스트
+struct ThreadArg
+{
+	shared_ptr<Test> sp;
+	int id;
+};
+
+DWORD WINAPI ThreadFunc(LPVOID lpParam)
+{
+	ThreadArg* tArg = (ThreadArg*)lpParam;
+	shared_ptr<Test> local = tArg->sp; // 복사 생성
+	std::cout << "[Thread " << tArg->id << "] shared_count = " << local.use_count() << std::endl;
+
+	weak_ptr<Test> w(local);
+	shared_ptr<Test> locked = w.lock();
+
+	if (!locked.get())
+		std::cout << "[Thread " << tArg->id << "] locked expired\n";
+	else
+		locked->Print();
+
+	Sleep(100); // 0.1초
+	return NULL;
+}
 
 int main()
 {
-	SharedPtr<Knight> pKnight(new Knight());
+	shared_ptr<Test> sp(new Test(42));
 
-	cout << "작업 전 원본(여긴 무조건 1): " << pKnight.UseCount() << endl;
+	const int NUM_THREADS = 5;
+	HANDLE threads[NUM_THREADS];
+	ThreadArg args[NUM_THREADS];
 
-	thread t1([&]()
-		{
-			for (int i = 0; i < 50000; i++)
-			{
-				SharedPtr<Knight> pTestKnight = pKnight;
-				cout << pTestKnight.UseCount() << endl;
-			}
-		});
-	thread t2([&]()
-		{
-			for (int i = 0; i < 50000; i++)
-			{
-				SharedPtr<Knight> pTestKnight = pKnight;
-				cout << pTestKnight.UseCount() << endl;
-			}
-		});
+	for (int i = 0; i < NUM_THREADS; i++) {
+		args[i].sp = sp;
+		args[i].id = i;
+		threads[i] = CreateThread(NULL, 0, ThreadFunc, &args[i], 0, NULL);
+	}
 
-	if (t1.joinable())
-		t1.join();
+	for (int i = 0; i < NUM_THREADS; i++) {
+		WaitForSingleObject(threads[i], INFINITE);
+	}
 
-	if (t2.joinable())
-		t2.join();
-
-	cout << "작업 후(1이 나오면 동기화 잘 되는 거): " << pKnight.UseCount() << endl;
+	std::cout << "[Main] shared_count = " << sp.use_count() << std::endl;
 
 	return 0;
 }

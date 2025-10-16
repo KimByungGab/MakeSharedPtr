@@ -20,7 +20,7 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="SharedPtr.h">
+    <ClInclude Include="SmartPtr.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
   </ItemGroup>
